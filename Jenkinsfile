@@ -10,7 +10,7 @@ pipeline {
   environment {
     IMAGE_NAME      = 'mc-status-webiste'                 // image repo name
     IMAGE_TAG       = "${env.BUILD_NUMBER}"           // or use GIT_COMMIT
-    REGISTRY_URL    = '10.111.54.64'          // no https://
+    REGISTRY_URL    = 'docker.lsgserver.dev'          // no https://
     DOCKER_CREDS_ID = 'registry-auth'         // Jenkins credentialsId (username/password)
     // ----------------------
     FULL_IMAGE = "${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
