@@ -9,9 +9,13 @@ pipeline {
   }
 
   environment {
-    // Change if your Jenkins uses different tool names
-    NODEJS_TOOL = 'node-20'
-    MAVEN_TOOL  = 'maven-3.9'
+    IMAGE_NAME      = 'mc-status-webiste'                 // image repo name
+    IMAGE_TAG       = "${env.BUILD_NUMBER}"           // or use GIT_COMMIT
+    REGISTRY_URL    = 'docker.lsgserver.dev'          // no https://
+    DOCKER_CREDS_ID = 'registry-auth'         // Jenkins credentialsId (username/password)
+    // ----------------------
+    FULL_IMAGE = "${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
+    LATEST_IMAGE = "${REGISTRY_URL}/${IMAGE_NAME}:latest"
   }
 
   stages {
@@ -21,78 +25,44 @@ pipeline {
       }
     }
 
-    stage('Build Web') {
-      steps {
-        script {
-          def nodeHome = tool(name: env.NODEJS_TOOL, type: 'jenkins.plugins.nodejs.tools.NodeJSInstallation')
-          withEnv(["PATH+NODE=${nodeHome}/bin"]) {
-            sh '''
-              set -eux
-              npm ci || npm install
-            '''
-          }
-        }
-      }
-    }
-
-    stage('Build Paper Plugin') {
-      steps {
-        script {
-          def mvnHome = tool(name: env.MAVEN_TOOL, type: 'hudson.tasks.Maven$MavenInstallation')
-          withEnv(["PATH+MAVEN=${mvnHome}/bin"]) {
-            sh '''
-              set -eux
-              cd paper-plugin
-              mvn -B -U clean package
-            '''
-          }
-        }
-      }
-    }
-
-    stage('Build Velocity Plugin') {
-      steps {
-        script {
-          def mvnHome = tool(name: env.MAVEN_TOOL, type: 'hudson.tasks.Maven$MavenInstallation')
-          withEnv(["PATH+MAVEN=${mvnHome}/bin"]) {
-            sh '''
-              set -eux
-              cd velocity-plugin
-              mvn -B -U clean package
-            '''
-          }
-        }
-      }
-    }
-
-    stage('Collect Artifacts') {
+    stage('Build Docker Image') {
       steps {
         sh '''
           set -eux
-          mkdir -p artifacts
-
-          # web files
-          cp package.json artifacts/ || true
-          cp server.js artifacts/ || true
-          cp Dockerfile artifacts/ || true
-
-          # plugin jars
-          cp paper-plugin/target/*.jar artifacts/ || true
-          cp velocity-plugin/target/*.jar artifacts/ || true
+          docker build -t "${FULL_IMAGE}" -t "${LATEST_IMAGE}" .
         '''
+      }
+    }
+
+    stage('Push Docker Image') {
+      steps {
+        withCredentials([usernamePassword(
+          credentialsId: "${DOCKER_CREDS_ID}",
+          usernameVariable: 'DOCKER_USER',
+          passwordVariable: 'DOCKER_PASS'
+        )]) {
+          sh '''
+            set -eux
+            echo "${DOCKER_PASS}" | docker login "${REGISTRY_URL}" -u "${DOCKER_USER}" --password-stdin
+            docker push "${FULL_IMAGE}"
+            docker push "${LATEST_IMAGE}"
+            docker logout "${REGISTRY_URL}"
+          '''
+        }
       }
     }
   }
 
   post {
-    always {
-      archiveArtifacts artifacts: 'artifacts/**', fingerprint: true
-    }
     success {
-      echo 'Build completed successfully.'
+      echo "Pushed: ${FULL_IMAGE}"
+      echo "Pushed: ${LATEST_IMAGE}"
     }
-    failure {
-      echo 'Build failed. Check stage logs.'
+    always {
+      sh '''
+        docker image rm "${FULL_IMAGE}" || true
+        docker image rm "${LATEST_IMAGE}" || true
+      '''
     }
   }
 }
