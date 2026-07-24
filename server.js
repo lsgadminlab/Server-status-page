@@ -5,7 +5,7 @@ const PORT = process.env.PORT || 8080;
 
 // Internal endpoints (reachable from THIS server, not from clients)
 const SERVICES = [
-  { id: "paper-main",  name: "Paper Main",  type: "paper",    url: "http://paper-main.minecraft.svc.cluster.local:8123/status" },
+  { id: "lobby",  name: "Lobby",  type: "paper",    url: "http://10.105.70.255:8123/status" },
   { id: "paper-lobby", name: "Paper Lobby", type: "paper",    url: "http://paper-lobby.minecraft.svc.cluster.local:8123/status" },
   { id: "velocity",    name: "Velocity",    type: "velocity", url: "http://YOUR_PROXY_PRIVATE_IP:8124/status" }
 ];
